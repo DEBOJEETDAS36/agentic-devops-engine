@@ -1,0 +1,17 @@
+# LangGraph Core & Ecosystem
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+langchain-groq>=0.2.0
+langchain-openai>=0.2.0
+
+# Data Manipulation & Execution Utilities
+pandas>=2.1.0
+matplotlib>=3.8.0
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+
+# Testing & Utilities
+pytest>=8.0.0
+rich>=13.0.0
