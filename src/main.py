@@ -1,7 +1,10 @@
 import os
 import sys
-from dotenv import load_dotenv
 
+# Ensure project root is in Python path for absolute imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from src.agent.graph import app_graph
 from src.agent.state import AgentState

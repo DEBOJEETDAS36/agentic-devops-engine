@@ -37,47 +37,36 @@ def reporter_node(state: AgentState) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Conditional Edge Routers
+# Combined Conditional Routing Logic
 # ---------------------------------------------------------------------------
 
-def should_self_correct(state: AgentState) -> Literal["self_correct_node", "step_router"]:
+def route_after_execution(state: AgentState) -> Literal["self_correct_node", "coder_node", "reporter_node", "__end__"]:
     """
-    Evaluates execution outcomes to decide whether to trigger self-correction
-    or route to step progression.
+    Evaluates execution outcomes to decide whether to:
+    1. Retry/Self-correct on error (if under max retries)
+    2. Advance to the next step in the plan (if steps remain)
+    3. Proceed to final report synthesis (if all steps finished)
+    4. Terminate early if retries are exhausted
     """
     error_tb = state.get("error_traceback")
     retry_count = state.get("retry_count", 0)
     max_retries = state.get("max_retries", 3)
     
-    # If code crashed and retry limit isn't reached, loop to self_correct_node
-    if error_tb and retry_count < max_retries:
-        return "self_correct_node"
-    
-    # Otherwise, proceed to step router (which either advances step or ends execution)
-    return "step_router"
-
-
-def step_router(state: AgentState) -> Literal["coder_node", "reporter_node", "END"]:
-    """
-    Advances step index upon success or handles terminal state on retry exhaustion.
-    """
-    error_tb = state.get("error_traceback")
-    
-    # If error persists after max retries, terminate graph safely
+    # 1. Error handling route
     if error_tb:
+        if retry_count < max_retries:
+            return "self_correct_node"
+        # Retry limit reached with unhandled error -> Terminate safely
         return END
-        
+
+    # 2. Step advancement route
     plan = state["plan"]
     current_idx = state["current_step_index"] + 1
-    
-    # Update current_step_index in state before next evaluation
     state["current_step_index"] = current_idx
     
-    # If more steps remain, return to coder_node for next step
     if current_idx < len(plan):
         return "coder_node"
         
-    # All steps completed successfully -> compile report
     return "reporter_node"
 
 
@@ -98,25 +87,26 @@ def build_graph() -> StateGraph:
     workflow.add_node("self_correct_node", self_correct_node)
     workflow.add_node("reporter_node", reporter_node)
     
-    # 2. Define Static Structural Edges
+    # 2. Define Static Edges
     workflow.add_edge(START, "planner_node")
     workflow.add_edge("planner_node", "coder_node")
     workflow.add_edge("coder_node", "execution_node")
     workflow.add_edge("self_correct_node", "execution_node")
     workflow.add_edge("reporter_node", END)
     
-    # 3. Add Conditional Edge Loops
+    # 3. Add Conditional Edge
     workflow.add_conditional_edges(
         "execution_node",
-        should_self_correct,
+        route_after_execution,
         {
             "self_correct_node": "self_correct_node",
-            "step_router": step_router,
+            "coder_node": "coder_node",
+            "reporter_node": "reporter_node",
+            END: END,
         }
     )
     
     return workflow.compile()
 
 
-# Export compiled graph instance
 app_graph = build_graph()
